@@ -1,32 +1,32 @@
 package com.investresearch.store;
 
 import com.investresearch.model.ResearchReport;
+import com.investresearch.repository.ReportRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Component
+@RequiredArgsConstructor
 public class ReportStore {
 
-    private final Map<String, ResearchReport> store = new ConcurrentHashMap<>();
+    private final ReportRepository repository;
 
     public void save(ResearchReport report) {
-        store.put(report.getId(), report);
+        repository.save(report);
     }
 
     public Optional<ResearchReport> findById(String id) {
-        return Optional.ofNullable(store.get(id));
+        return repository.findById(id);
     }
 
     public List<ResearchReport> findAll() {
-        return new ArrayList<>(store.values());
+        return repository.findAllByOrderByGeneratedAtDesc();
     }
 
     public void delete(String id) {
-        store.remove(id);
+        repository.deleteById(id);
     }
 }

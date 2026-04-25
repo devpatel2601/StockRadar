@@ -1,12 +1,13 @@
 package com.investresearch.model;
 
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class SearchResult {
     private String query;
     private String title;
