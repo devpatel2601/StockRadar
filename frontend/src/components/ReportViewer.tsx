@@ -4,17 +4,25 @@ import ReactMarkdown from 'react-markdown'
 import type { ResearchReport } from '../types'
 import { PHASE_LABELS } from '../types'
 import { api } from '../services/api'
+import { formatDate, formatCurrency, phaseCount } from '../lib/format'
+
+const FINAL_TAB = 'FINAL_REPORT'
 
 export default function ReportViewer() {
   const { id } = useParams<{ id: string }>()
   const [report, setReport] = useState<ResearchReport | null>(null)
-  const [activePhase, setActivePhase] = useState<string>('PORTFOLIO_CONSTRUCTION')
+  const [activeTab, setActiveTab] = useState<string>(FINAL_TAB)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!id) return
-    api.getReport(id)
-      .then(r => { setReport(r); setLoading(false) })
+    api
+      .getReport(id)
+      .then(r => {
+        setReport(r)
+        setActiveTab(r.finalBriefing ? FINAL_TAB : 'PORTFOLIO_CONSTRUCTION')
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [id])
 
@@ -22,7 +30,7 @@ export default function ReportViewer() {
     return (
       <div className="loading-overlay">
         <div className="spinner" style={{ width: 36, height: 36 }} />
-        <span>Loading report...</span>
+        <span>Loading report…</span>
       </div>
     )
   }
@@ -30,35 +38,58 @@ export default function ReportViewer() {
   if (!report) {
     return (
       <div className="card">
-        <p>Report not found. <Link to="/">Go back</Link></p>
+        <p>
+          Report not found. <Link to="/">Go back</Link>
+        </p>
       </div>
     )
   }
 
+  const { ok, failed } = phaseCount(report.phases)
   const phaseKeys = Object.keys(PHASE_LABELS)
-  const currentPhase = report.phases[activePhase]
+  const currentIsPhase = activeTab !== FINAL_TAB
+  const currentPhase = currentIsPhase ? report.phases[activeTab] : null
 
   return (
     <div>
-      <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <Link to="/" style={{ fontSize: 13, color: 'var(--text-muted)' }}>← Dashboard</Link>
-        <span style={{ color: 'var(--border)' }}>|</span>
-        <span style={{ fontSize: 13 }}>
-          {report.profile.country} · {report.profile.riskTolerance} · {report.profile.goal} · {report.profile.timelineYears}yr
-        </span>
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>
-          Generated {new Date(report.generatedAt).toLocaleString()}
-        </span>
+      {/* ── Breadcrumb + profile summary ── */}
+      <div className="rv-header">
+        <Link to="/" className="rv-back">← Dashboard</Link>
+        <div className="rv-profile">
+          <span className="rv-profile-chip">{report.profile.country}</span>
+          <span className="rv-profile-chip">{report.profile.riskTolerance}</span>
+          <span className="rv-profile-chip">{report.profile.goal}</span>
+          <span className="rv-profile-chip">{report.profile.timelineYears}yr</span>
+          <span className="rv-profile-chip">{formatCurrency(report.profile.investmentAmount)}</span>
+          {report.profile.sectorInterests.map(s => (
+            <span key={s} className="rv-profile-chip rv-chip-sector">{s}</span>
+          ))}
+        </div>
+        <div className="rv-meta">
+          <span className={`badge ${failed > 0 ? 'badge-warning' : 'badge-success'}`}>
+            {ok}/{ok + failed} phases OK
+          </span>
+          <span className="rv-date">{formatDate(report.generatedAt)}</span>
+        </div>
       </div>
 
+      {/* ── Tabs ── */}
       <div className="phase-tabs">
+        {report.finalBriefing && (
+          <button
+            className={`phase-tab phase-tab--final ${activeTab === FINAL_TAB ? 'active' : ''}`}
+            onClick={() => setActiveTab(FINAL_TAB)}
+          >
+            Final Report
+          </button>
+        )}
         {phaseKeys.map(key => {
           const phase = report.phases[key]
           return (
             <button
               key={key}
-              className={`phase-tab ${activePhase === key ? 'active' : ''} ${phase && !phase.success ? 'failed' : ''}`}
-              onClick={() => setActivePhase(key)}
+              className={`phase-tab ${activeTab === key ? 'active' : ''} ${phase && !phase.success ? 'failed' : ''}`}
+              onClick={() => setActiveTab(key)}
             >
               {PHASE_LABELS[key]}
               {phase && !phase.success && ' ⚠'}
@@ -67,32 +98,46 @@ export default function ReportViewer() {
         })}
       </div>
 
+      {/* ── Content ── */}
       <div className="card">
-        <div className="card-title">{PHASE_LABELS[activePhase]}</div>
-
-        {!currentPhase ? (
-          <p style={{ color: 'var(--text-muted)' }}>No data for this phase.</p>
-        ) : !currentPhase.success ? (
-          <div style={{ color: 'var(--danger)' }}>
-            Phase failed: {currentPhase.errorMessage}
-          </div>
+        {activeTab === FINAL_TAB ? (
+          <>
+            <div className="card-title">Final Investment Briefing</div>
+            <div className="markdown">
+              <ReactMarkdown>{report.finalBriefing}</ReactMarkdown>
+            </div>
+          </>
+        ) : !currentPhase ? (
+          <>
+            <div className="card-title">{PHASE_LABELS[activeTab]}</div>
+            <p style={{ color: 'var(--text-muted)' }}>No data for this phase.</p>
+          </>
         ) : (
           <>
-            {currentPhase.searchQueries?.length > 0 && (
-              <details style={{ marginBottom: 16 }}>
-                <summary style={{ fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
-                  {currentPhase.searchQueries.length} search queries used
-                </summary>
-                <ul style={{ marginTop: 8, paddingLeft: 20 }}>
-                  {currentPhase.searchQueries.map((q, i) => (
-                    <li key={i} style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{q}</li>
-                  ))}
-                </ul>
-              </details>
+            <div className="card-title">{PHASE_LABELS[activeTab]}</div>
+            {!currentPhase.success ? (
+              <div style={{ color: 'var(--danger)' }}>
+                Phase failed: {currentPhase.errorMessage}
+              </div>
+            ) : (
+              <>
+                {currentPhase.searchQueries?.length > 0 && (
+                  <details className="search-queries">
+                    <summary>
+                      {currentPhase.searchQueries.length} search queries used
+                    </summary>
+                    <ul>
+                      {currentPhase.searchQueries.map((q, i) => (
+                        <li key={i}>{q}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                <div className="markdown">
+                  <ReactMarkdown>{currentPhase.synthesis}</ReactMarkdown>
+                </div>
+              </>
             )}
-            <div className="markdown">
-              <ReactMarkdown>{currentPhase.synthesis}</ReactMarkdown>
-            </div>
           </>
         )}
       </div>

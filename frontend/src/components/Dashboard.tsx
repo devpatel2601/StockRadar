@@ -1,52 +1,32 @@
-import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { InvestorProfile, ResearchReport } from '../types'
-import { api } from '../services/api'
+import type { InvestorProfile } from '../types'
+import { useReports } from '../hooks/useReports'
+import { formatDate, formatCurrency } from '../lib/format'
 import ProfileForm from './ProfileForm'
+import AnalysisProgress from './AnalysisProgress'
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const [reports, setReports] = useState<ResearchReport[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    api.getReports()
-      .then(setReports)
-      .catch(() => {})
-  }, [])
+  const { reports, analyzing, error, runAnalysis, deleteReport } = useReports()
 
   async function handleAnalyze(profile: InvestorProfile) {
-    setLoading(true)
-    setError(null)
-    try {
-      const report = await api.runAnalysis(profile)
-      setReports(prev => [report, ...prev])
-      navigate(`/report/${report.id}`)
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Analysis failed. Is the backend running?'
-      setError(msg)
-    } finally {
-      setLoading(false)
-    }
+    const report = await runAnalysis(profile)
+    if (report) navigate(`/report/${report.id}`)
   }
 
   async function handleDelete(id: string, e: React.MouseEvent) {
     e.stopPropagation()
-    await api.deleteReport(id)
-    setReports(prev => prev.filter(r => r.id !== id))
+    await deleteReport(id)
   }
 
   return (
-    <div>
+    <>
+      {analyzing && <AnalysisProgress />}
+
       <div className="card">
         <div className="card-title">New Analysis</div>
-        {error && (
-          <div style={{ color: 'var(--danger)', marginBottom: 16, fontSize: 13 }}>
-            {error}
-          </div>
-        )}
-        <ProfileForm onSubmit={handleAnalyze} loading={loading} />
+        {error && <div className="error-banner">{error}</div>}
+        <ProfileForm onSubmit={handleAnalyze} loading={analyzing} />
       </div>
 
       {reports.length > 0 && (
@@ -59,24 +39,38 @@ export default function Dashboard() {
                 className="report-card"
                 onClick={() => navigate(`/report/${r.id}`)}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div className="report-card-top">
                   <div>
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                      {r.profile.country} · {r.profile.riskTolerance}
+                    <div className="report-card-heading">
+                      {r.profile.country} &middot; {r.profile.riskTolerance}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                      {r.profile.goal} · {r.profile.timelineYears}yr · ${r.profile.investmentAmount.toLocaleString()}
+                    <div className="report-card-meta">
+                      {r.profile.goal} &middot; {r.profile.timelineYears}yr
+                      &middot; {formatCurrency(r.profile.investmentAmount)}
+                    </div>
+                    <div className="report-card-sectors">
+                      {r.profile.sectorInterests.slice(0, 3).join(', ')}
+                      {r.profile.sectorInterests.length > 3 && ` +${r.profile.sectorInterests.length - 3}`}
                     </div>
                   </div>
-                  <span className={`badge ${r.status === 'COMPLETED' ? 'badge-success' : r.status === 'FAILED' ? 'badge-danger' : 'badge-warning'}`}>
+                  <span
+                    className={`badge ${
+                      r.status === 'COMPLETED'
+                        ? 'badge-success'
+                        : r.status === 'FAILED'
+                        ? 'badge-danger'
+                        : 'badge-warning'
+                    }`}
+                  >
                     {r.status}
                   </span>
                 </div>
-                <div className="report-meta" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{new Date(r.generatedAt).toLocaleString()}</span>
+
+                <div className="report-card-footer">
+                  <span>{formatDate(r.generatedAt)}</span>
                   <button
                     className="btn btn-danger btn-sm"
-                    onClick={(e) => handleDelete(r.id, e)}
+                    onClick={e => handleDelete(r.id, e)}
                   >
                     Delete
                   </button>
@@ -86,6 +80,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
