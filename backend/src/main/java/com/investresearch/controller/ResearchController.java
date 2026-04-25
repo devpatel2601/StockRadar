@@ -10,7 +10,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @RestController
@@ -22,16 +25,27 @@ public class ResearchController {
     private final ReportStore reportStore;
 
     /**
-     * Run a full 5-phase investment analysis.
-     * Note: this is synchronous and can take 30-120 seconds depending on the AI + search calls.
-     * Future: migrate to async with SSE streaming.
+     * Kick off a 5-phase analysis asynchronously.
+     * Returns 202 Accepted immediately with a PENDING report.
+     * Poll GET /reports/{id} until status == COMPLETED or FAILED.
      */
     @PostMapping("/analyze")
     public ResponseEntity<ResearchReport> analyze(@Valid @RequestBody InvestorProfile profile) {
-        log.info("POST /analyze — country={}, risk={}, goal={}", profile.getCountry(), profile.getRiskTolerance(), profile.getGoal());
-        ResearchReport report = orchestrator.runFullAnalysis(profile);
+        String reportId = UUID.randomUUID().toString();
+        log.info("POST /analyze — reportId={} country={} risk={}", reportId, profile.getCountry(), profile.getRiskTolerance());
+
+        ResearchReport report = ResearchReport.builder()
+                .id(reportId)
+                .generatedAt(LocalDateTime.now())
+                .profile(profile)
+                .phases(new LinkedHashMap<>())
+                .status(ResearchReport.ReportStatus.PENDING)
+                .build();
+
         reportStore.save(report);
-        return ResponseEntity.ok(report);
+        orchestrator.runAnalysisAsync(reportId, profile);
+
+        return ResponseEntity.accepted().body(report);
     }
 
     @GetMapping("/reports")

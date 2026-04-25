@@ -4,7 +4,7 @@ import type { InvestorProfile, ResearchReport } from '../types'
 const client = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
-  timeout: 300_000, // 5 minutes — full analysis takes time
+  timeout: 15_000, // POST /analyze now returns immediately (async backend)
 })
 
 export const api = {
