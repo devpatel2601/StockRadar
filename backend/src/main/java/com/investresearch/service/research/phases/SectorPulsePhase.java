@@ -33,9 +33,11 @@ public class SectorPulsePhase implements ResearchPhase {
     public PhaseResult execute(InvestorProfile profile, Map<String, PhaseResult> previousPhases) {
         log.info("Phase 2 — Sector Pulse");
 
-        List<String> sectors = (profile.getSectorInterests() != null && !profile.getSectorInterests().isEmpty())
+        List<String> all = (profile.getSectorInterests() != null && !profile.getSectorInterests().isEmpty())
                 ? profile.getSectorInterests()
                 : List.of("Technology", "Energy", "Financials");
+        List<String> sectors = all.size() > 5 ? all.subList(0, 5) : all;
+        if (all.size() > 5) log.info("Capping sectors {}->{} to stay within token limits", all.size(), sectors.size());
 
         List<String> queries = new ArrayList<>();
         for (String sector : sectors) {
