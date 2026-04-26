@@ -1,6 +1,8 @@
 package com.investresearch.config;
 
 import com.investresearch.security.FirebaseAuthFilter;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -21,7 +23,6 @@ public class SecurityConfig {
     // ── Easy to change: move a path here to make it public ───────────────────
     private static final String[] PUBLIC_PATHS = {
             "/api/tax-calendar/**",   // public lead-magnet page
-            "/h2-console/**",         // dev only
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
@@ -37,8 +38,13 @@ public class SecurityConfig {
             .headers(h -> h.frameOptions(f -> f.disable())) // H2 console uses iframes
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(PathRequest.toH2Console()).permitAll() // covers /h2-console + sub-paths
                 .requestMatchers(PUBLIC_PATHS).permitAll()
                 .anyRequest().authenticated()
+            )
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((req, res, e) ->
+                    res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
             )
             .addFilterBefore(firebaseAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
