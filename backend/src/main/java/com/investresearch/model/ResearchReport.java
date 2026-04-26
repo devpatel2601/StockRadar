@@ -19,6 +19,9 @@ public class ResearchReport {
     @Id
     private String id;
 
+    @Column(name = "user_id", nullable = false)
+    private String userId;
+
     private LocalDateTime generatedAt;
 
     @Convert(converter = InvestorProfileConverter.class)
