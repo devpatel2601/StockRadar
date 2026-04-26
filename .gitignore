@@ -29,5 +29,8 @@ Thumbs.db
 .env.*
 !.env.example
 
+# Firebase service account (contains private key — NEVER commit)
+backend/firebase-service-account.json
+
 # Session artifacts
 CHAT_SUMMARY.md
