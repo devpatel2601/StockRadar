@@ -140,7 +140,7 @@ export default function ProfileForm({ onSubmit, loading }: Props) {
           {loading ? (
             <>
               <div className="spinner" />
-              Analyzing... (this takes 1-3 minutes)
+              Starting analysis…
             </>
           ) : (
             'Run Investment Analysis'

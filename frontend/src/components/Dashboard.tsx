@@ -3,7 +3,6 @@ import type { InvestorProfile } from '../types'
 import { useReports } from '../hooks/useReports'
 import { formatDate, formatCurrency } from '../lib/format'
 import ProfileForm from './ProfileForm'
-import AnalysisProgress from './AnalysisProgress'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -21,8 +20,6 @@ export default function Dashboard() {
 
   return (
     <>
-      {analyzing && <AnalysisProgress />}
-
       <div className="card">
         <div className="card-title">New Analysis</div>
         {error && <div className="error-banner">{error}</div>}
@@ -55,11 +52,9 @@ export default function Dashboard() {
                   </div>
                   <span
                     className={`badge ${
-                      r.status === 'COMPLETED'
-                        ? 'badge-success'
-                        : r.status === 'FAILED'
-                        ? 'badge-danger'
-                        : 'badge-warning'
+                      r.status === 'COMPLETED' ? 'badge-success'
+                      : r.status === 'FAILED'    ? 'badge-danger'
+                      : 'badge-warning'
                     }`}
                   >
                     {r.status}
