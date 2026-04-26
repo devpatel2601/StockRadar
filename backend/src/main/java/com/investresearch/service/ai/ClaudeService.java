@@ -11,6 +11,8 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -18,16 +20,42 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ClaudeService {
 
-    private final ChatModel chatModel;  // provider-agnostic — swap Groq ↔ Claude in pom.xml + application.properties
+    private static final int MAX_RESULTS_PER_CALL = 10;
+    private static final int MAX_CONTENT_CHARS    = 350;
+    private static final int MAX_RETRIES          = 3;
+    private static final Pattern RETRY_AFTER_PATTERN =
+            Pattern.compile("try again in (\\d+\\.?\\d*)s", Pattern.CASE_INSENSITIVE);
+
+    private final ChatModel chatModel;
 
     public String analyze(String systemPrompt, String userContent) {
-        log.debug("Calling AI — userContent length={}", userContent.length());
-        Prompt prompt = new Prompt(List.of(
-                new SystemMessage(systemPrompt),
-                new UserMessage(userContent)
-        ));
-        ChatResponse response = chatModel.call(prompt);
-        return response.getResult().getOutput().getText();
+        int attempt = 0;
+        while (true) {
+            try {
+                log.debug("Calling AI — attempt={}, contentLen={}", attempt + 1, userContent.length());
+                Prompt prompt = new Prompt(List.of(
+                        new SystemMessage(systemPrompt),
+                        new UserMessage(userContent)
+                ));
+                ChatResponse response = chatModel.call(prompt);
+                return response.getResult().getOutput().getText();
+            } catch (Exception e) {
+                attempt++;
+                String msg = e.getMessage() != null ? e.getMessage() : "";
+                boolean isRateLimit = msg.contains("429") || msg.contains("rate_limit_exceeded");
+                if (!isRateLimit || attempt >= MAX_RETRIES) {
+                    throw e;
+                }
+                long waitMs = parseWaitMs(msg);
+                log.warn("Rate limit hit (attempt {}), backing off {}ms", attempt, waitMs);
+                try {
+                    Thread.sleep(waitMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted during rate-limit backoff", ie);
+                }
+            }
+        }
     }
 
     public String synthesizePhase(String phaseName, String phaseInstructions, List<SearchResult> results) {
@@ -40,9 +68,15 @@ public class ClaudeService {
                 - Be concise but thorough. Use headers and bullet points for readability.
                 """;
 
-        String searchBlock = results.stream()
+        List<SearchResult> capped = results.stream().limit(MAX_RESULTS_PER_CALL).toList();
+        if (results.size() > MAX_RESULTS_PER_CALL) {
+            log.debug("Capped results for {} from {} to {}", phaseName, results.size(), MAX_RESULTS_PER_CALL);
+        }
+
+        String searchBlock = capped.stream()
                 .map(r -> "Query: %s\nTitle: %s\nURL: %s\nContent: %s"
-                        .formatted(r.getQuery(), r.getTitle(), r.getUrl(), r.getFullContent()))
+                        .formatted(r.getQuery(), r.getTitle(), r.getUrl(),
+                                truncate(r.getFullContent(), MAX_CONTENT_CHARS)))
                 .collect(Collectors.joining("\n\n---\n\n"));
 
         String userContent = """
@@ -56,5 +90,19 @@ public class ClaudeService {
                 """.formatted(phaseName, phaseInstructions, searchBlock);
 
         return analyze(systemPrompt, userContent);
+    }
+
+    private long parseWaitMs(String errorMessage) {
+        Matcher m = RETRY_AFTER_PATTERN.matcher(errorMessage);
+        if (m.find()) {
+            double seconds = Double.parseDouble(m.group(1));
+            return (long)(seconds * 1000) + 2_000;
+        }
+        return 15_000;
+    }
+
+    private String truncate(String s, int max) {
+        if (s == null) return "";
+        return s.length() <= max ? s : s.substring(0, max) + "…";
     }
 }

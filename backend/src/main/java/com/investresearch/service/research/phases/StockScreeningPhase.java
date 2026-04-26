@@ -33,9 +33,10 @@ public class StockScreeningPhase implements ResearchPhase {
     public PhaseResult execute(InvestorProfile profile, Map<String, PhaseResult> previousPhases) {
         log.info("Phase 4 — Stock Screening");
 
-        List<String> sectors = (profile.getSectorInterests() != null && !profile.getSectorInterests().isEmpty())
+        List<String> all = (profile.getSectorInterests() != null && !profile.getSectorInterests().isEmpty())
                 ? profile.getSectorInterests()
                 : List.of("Technology", "Energy");
+        List<String> sectors = all.size() > 5 ? all.subList(0, 5) : all;
 
         List<String> queries = new ArrayList<>();
         for (String sector : sectors) {
