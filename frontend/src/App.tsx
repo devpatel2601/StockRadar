@@ -11,6 +11,7 @@ import PhoneVerifyPage from './components/auth/PhoneVerifyPage'
 import EmailVerifyPage from './components/auth/EmailVerifyPage'
 import ForgotPasswordPage from './components/auth/ForgotPasswordPage'
 import CompleteProfilePage from './components/auth/CompleteProfilePage'
+import TaxCalendarPage from './components/TaxCalendarPage'
 import './index.css'
 
 export default function App() {
@@ -34,6 +35,9 @@ function AppShell() {
     <div className="app">
       <header className="app-header">
         <Link to="/" className="app-title">StockRadar</Link>
+        <nav className="app-nav">
+          <Link to="/tax-calendar" className="app-nav-link">Tax Guide</Link>
+        </nav>
         <div className="app-header-right">
           {user ? (
             <>
@@ -60,6 +64,7 @@ function AppShell() {
           <Route path="/verify-email"    element={<EmailVerifyPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/complete-profile" element={<CompleteProfilePage />} />
+          <Route path="/tax-calendar"     element={<TaxCalendarPage />} />
 
           {/* ── Protected ──────────────────────────────────────────────── */}
           <Route path="/" element={
