@@ -3,6 +3,7 @@ package com.investresearch.service.research.phases;
 import com.investresearch.model.InvestorProfile;
 import com.investresearch.model.PhaseResult;
 import com.investresearch.service.ai.ClaudeService;
+import com.investresearch.service.research.PhaseVariantSelector;
 import com.investresearch.service.research.ResearchPhase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,7 @@ import java.util.Map;
 public class PortfolioConstructionPhase implements ResearchPhase {
 
     private final ClaudeService claudeService;
+    private final PhaseVariantSelector selector;
 
     @Override
     public String getPhaseName() { return "PORTFOLIO_CONSTRUCTION"; }
@@ -61,6 +63,8 @@ public class PortfolioConstructionPhase implements ResearchPhase {
                 MACRO CONTEXT:
                 %s
 
+                %s
+
                 Produce the following sections:
 
                 ## Portfolio Construction Note
@@ -93,6 +97,7 @@ public class PortfolioConstructionPhase implements ResearchPhase {
                 profile.getRiskTolerance(), profile.getTimelineYears(),
                 profile.getGoal(), profile.getAccounts(), profile.getCurrentHoldings(),
                 stockAnalysis, macroContext,
+                selector.portfolioFocus(),
                 profile.getRiskTolerance(), profile.getInvestmentAmount()
         );
 
