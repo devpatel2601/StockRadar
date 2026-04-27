@@ -4,6 +4,7 @@ import com.investresearch.model.InvestorProfile;
 import com.investresearch.model.PhaseResult;
 import com.investresearch.model.SearchResult;
 import com.investresearch.service.ai.ClaudeService;
+import com.investresearch.service.research.PhaseVariantSelector;
 import com.investresearch.service.research.ResearchPhase;
 import com.investresearch.service.search.SearchService;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -22,6 +22,7 @@ public class SectorPulsePhase implements ResearchPhase {
 
     private final SearchService searchService;
     private final ClaudeService claudeService;
+    private final PhaseVariantSelector selector;
 
     @Override
     public String getPhaseName() { return "SECTOR_PULSE"; }
@@ -39,13 +40,7 @@ public class SectorPulsePhase implements ResearchPhase {
         List<String> sectors = all.size() > 5 ? all.subList(0, 5) : all;
         if (all.size() > 5) log.info("Capping sectors {}->{} to stay within token limits", all.size(), sectors.size());
 
-        List<String> queries = new ArrayList<>();
-        for (String sector : sectors) {
-            queries.add(sector + " stocks Canada TSX outlook 2026");
-            queries.add(sector + " ETF performance returns 2026");
-            queries.add(sector + " sector catalysts risks next 6 months 2026");
-        }
-
+        List<String> queries = selector.sectorQueries(sectors);
         List<SearchResult> results = searchService.searchAll(queries);
 
         String sectorList = String.join(", ", sectors);
@@ -57,7 +52,9 @@ public class SectorPulsePhase implements ResearchPhase {
 
                 Then write 2-3 sentences of commentary per sector explaining the current environment,
                 noting any TSX-listed ETFs or benchmarks as reference.
-                """.formatted(sectorList);
+
+                %s
+                """.formatted(sectorList, selector.sectorFocus());
 
         String synthesis = claudeService.synthesizePhase(getPhaseName(), instructions, results);
 

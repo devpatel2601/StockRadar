@@ -4,6 +4,7 @@ import com.investresearch.model.InvestorProfile;
 import com.investresearch.model.PhaseResult;
 import com.investresearch.model.SearchResult;
 import com.investresearch.service.ai.ClaudeService;
+import com.investresearch.service.research.PhaseVariantSelector;
 import com.investresearch.service.research.ResearchPhase;
 import com.investresearch.service.search.SearchService;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -22,6 +22,7 @@ public class StockScreeningPhase implements ResearchPhase {
 
     private final SearchService searchService;
     private final ClaudeService claudeService;
+    private final PhaseVariantSelector selector;
 
     @Override
     public String getPhaseName() { return "STOCK_SCREENING"; }
@@ -38,22 +39,12 @@ public class StockScreeningPhase implements ResearchPhase {
                 : List.of("Technology", "Energy");
         List<String> sectors = all.size() > 5 ? all.subList(0, 5) : all;
 
-        List<String> queries = new ArrayList<>();
-        for (String sector : sectors) {
-            queries.add("best " + sector + " stocks TSX Canada buy recommendation 2026");
-            queries.add("top " + sector + " dividend growth stocks Canada 2026");
-        }
-        queries.add("top TSX stocks undervalued analyst buy 2026 " + profile.getRiskTolerance().name().toLowerCase());
-        queries.add("Canadian stocks strong earnings momentum 2026");
-
+        List<String> queries = selector.stockQueries(sectors, profile.getRiskTolerance().name());
         List<SearchResult> results = searchService.searchAll(queries);
 
-        String macroSummary = truncate(previousPhases.getOrDefault("MACRO_ENVIRONMENT",
-                emptyPhase()).getSynthesis(), 400);
-        String sectorSummary = truncate(previousPhases.getOrDefault("SECTOR_PULSE",
-                emptyPhase()).getSynthesis(), 400);
-        String smartMoneySummary = truncate(previousPhases.getOrDefault("SMART_MONEY",
-                emptyPhase()).getSynthesis(), 400);
+        String macroSummary   = truncate(previousPhases.getOrDefault("MACRO_ENVIRONMENT", emptyPhase()).getSynthesis(), 400);
+        String sectorSummary  = truncate(previousPhases.getOrDefault("SECTOR_PULSE",      emptyPhase()).getSynthesis(), 400);
+        String smartSummary   = truncate(previousPhases.getOrDefault("SMART_MONEY",       emptyPhase()).getSynthesis(), 400);
 
         String instructions = """
                 Using the search results and context below, identify 8-12 candidate stocks,
@@ -84,10 +75,13 @@ public class StockScreeningPhase implements ResearchPhase {
                 Macro context: %s
                 Sector context: %s
                 Smart money context: %s
+
+                %s
                 """.formatted(
                 profile.getRiskTolerance(), profile.getTimelineYears(), profile.getGoal(),
                 sectors, profile.getAccounts(),
-                macroSummary, sectorSummary, smartMoneySummary
+                macroSummary, sectorSummary, smartSummary,
+                selector.stockFocus()
         );
 
         String synthesis = claudeService.synthesizePhase(getPhaseName(), instructions, results);

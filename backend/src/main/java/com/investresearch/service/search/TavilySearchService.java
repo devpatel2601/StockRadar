@@ -1,10 +1,13 @@
 package com.investresearch.service.search;
 
+import com.investresearch.config.CacheConfig;
 import com.investresearch.model.SearchResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -16,6 +19,10 @@ import java.util.Map;
  * Tavily Search integration. Activate by setting:
  *   search.provider=tavily
  *   TAVILY_API_KEY=<your-key>
+ *
+ * Results are cached in-memory (Caffeine) for 8 hours keyed by query string.
+ * This is done manually in search() rather than via @Cacheable to avoid
+ * Spring AOP self-invocation issues when searchAll() calls search() internally.
  */
 @Slf4j
 @Service
@@ -32,11 +39,21 @@ public class TavilySearchService implements SearchService {
     private int maxResults;
 
     private final WebClient.Builder webClientBuilder;
+    private final CacheManager cacheManager;
 
     @Override
     @SuppressWarnings("unchecked")
     public List<SearchResult> search(String query) {
-        log.debug("[TavilySearch] query='{}'", query);
+        Cache cache = cacheManager.getCache(CacheConfig.SEARCH_RESULTS);
+        if (cache != null) {
+            Cache.ValueWrapper hit = cache.get(query);
+            if (hit != null) {
+                log.debug("[TavilySearch] cache hit for '{}'", query);
+                return (List<SearchResult>) hit.get();
+            }
+        }
+
+        log.debug("[TavilySearch] querying Tavily: '{}'", query);
         try {
             Map<String, Object> requestBody = Map.of(
                     "api_key", apiKey,
@@ -58,7 +75,7 @@ public class TavilySearchService implements SearchService {
             }
 
             List<Map<String, Object>> results = (List<Map<String, Object>>) response.get("results");
-            return results.stream()
+            List<SearchResult> parsed = results.stream()
                     .map(r -> SearchResult.builder()
                             .query(query)
                             .title((String) r.getOrDefault("title", ""))
@@ -68,6 +85,10 @@ public class TavilySearchService implements SearchService {
                             .retrievedAt(LocalDateTime.now())
                             .build())
                     .toList();
+
+            if (cache != null) cache.put(query, parsed);
+            return parsed;
+
         } catch (Exception e) {
             log.error("Tavily search failed for query '{}': {}", query, e.getMessage());
             return List.of();

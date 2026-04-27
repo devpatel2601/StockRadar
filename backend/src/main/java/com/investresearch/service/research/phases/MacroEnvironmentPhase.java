@@ -4,6 +4,7 @@ import com.investresearch.model.InvestorProfile;
 import com.investresearch.model.PhaseResult;
 import com.investresearch.model.SearchResult;
 import com.investresearch.service.ai.ClaudeService;
+import com.investresearch.service.research.PhaseVariantSelector;
 import com.investresearch.service.research.ResearchPhase;
 import com.investresearch.service.search.SearchService;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class MacroEnvironmentPhase implements ResearchPhase {
 
     private final SearchService searchService;
     private final ClaudeService claudeService;
+    private final PhaseVariantSelector selector;
 
     @Override
     public String getPhaseName() { return "MACRO_ENVIRONMENT"; }
@@ -32,16 +34,7 @@ public class MacroEnvironmentPhase implements ResearchPhase {
     public PhaseResult execute(InvestorProfile profile, Map<String, PhaseResult> previousPhases) {
         log.info("Phase 1 — Macro Environment");
 
-        List<String> queries = List.of(
-                "Bank of Canada interest rate decision latest 2026 forward guidance",
-                "Federal Reserve interest rate stance impact on Canadian markets 2026",
-                "CAD USD exchange rate trend 2026",
-                "Canada CPI inflation latest data 2026",
-                "TSX composite index current level 52-week range trend",
-                "S&P 500 current level trend 2026",
-                "Canada US tariffs trade agreements geopolitical events 2026"
-        );
-
+        List<String> queries = selector.macroQueries();
         List<SearchResult> results = searchService.searchAll(queries);
 
         String instructions = """
@@ -51,7 +44,9 @@ public class MacroEnvironmentPhase implements ResearchPhase {
                 3. Three key headwinds for Canadian investors right now
                 4. Interest rate trajectory and its implications for different asset classes
                 5. CAD/USD context and how it affects cross-border holdings
-                """;
+
+                %s
+                """.formatted(selector.macroFocus());
 
         String synthesis = claudeService.synthesizePhase(getPhaseName(), instructions, results);
 
