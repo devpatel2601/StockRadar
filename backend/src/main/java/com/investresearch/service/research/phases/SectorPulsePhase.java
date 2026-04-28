@@ -4,6 +4,7 @@ import com.investresearch.model.InvestorProfile;
 import com.investresearch.model.PhaseResult;
 import com.investresearch.model.SearchResult;
 import com.investresearch.service.ai.ClaudeService;
+import com.investresearch.service.research.PhaseScoreParser;
 import com.investresearch.service.research.PhaseVariantSelector;
 import com.investresearch.service.research.ResearchPhase;
 import com.investresearch.service.search.SearchService;
@@ -45,7 +46,16 @@ public class SectorPulsePhase implements ResearchPhase {
 
         String sectorList = String.join(", ", sectors);
         String instructions = """
-                For each of these sectors: %s
+                At the very start of your response, output EXACTLY this block (no text before it):
+
+                ---SCORES---
+                sector_<ExactSectorName>=<integer 0-100>
+                (one line per sector using the exact names from the list above)
+                ---END SCORES---
+
+                (score 100 = extremely bullish momentum, 0 = severe downtrend)
+
+                Then for each of these sectors: %s
 
                 Produce a scorecard table with these columns:
                 | Sector | Momentum (STRONG/NEUTRAL/WEAK) | Key Catalyst (3-6 months) | Key Risk | In/Out of Favor? |
@@ -56,13 +66,15 @@ public class SectorPulsePhase implements ResearchPhase {
                 %s
                 """.formatted(sectorList, selector.sectorFocus());
 
-        String synthesis = claudeService.synthesizePhase(getPhaseName(), instructions, results);
+        String raw = claudeService.synthesizePhase(getPhaseName(), instructions, results);
+        PhaseScoreParser.ParsedPhase parsed = PhaseScoreParser.parse(raw);
 
         return PhaseResult.builder()
                 .phaseName(getPhaseName())
                 .searchQueries(queries)
                 .rawResults(results)
-                .synthesis(synthesis)
+                .synthesis(parsed.synthesis())
+                .scores(parsed.scores())
                 .completedAt(LocalDateTime.now())
                 .success(true)
                 .build();

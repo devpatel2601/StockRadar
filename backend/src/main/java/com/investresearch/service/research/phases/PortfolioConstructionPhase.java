@@ -3,6 +3,7 @@ package com.investresearch.service.research.phases;
 import com.investresearch.model.InvestorProfile;
 import com.investresearch.model.PhaseResult;
 import com.investresearch.service.ai.ClaudeService;
+import com.investresearch.service.research.PhaseScoreParser;
 import com.investresearch.service.research.PhaseVariantSelector;
 import com.investresearch.service.research.ResearchPhase;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +47,15 @@ public class PortfolioConstructionPhase implements ResearchPhase {
                 """;
 
         String userContent = """
-                Produce a complete Portfolio Construction Brief for this investor.
+                At the very start of your response, output EXACTLY this block (no text before it):
+
+                ---SCORES---
+                portfolioHealthScore=<integer 0-100>
+                ---END SCORES---
+
+                (portfolioHealthScore: 100 = perfectly diversified, risk-matched, catalyst-rich portfolio aligned with the investor's profile)
+
+                Then produce a complete Portfolio Construction Brief for this investor.
 
                 INVESTOR PROFILE:
                 - Country: %s
@@ -101,13 +110,15 @@ public class PortfolioConstructionPhase implements ResearchPhase {
                 profile.getRiskTolerance(), profile.getInvestmentAmount()
         );
 
-        String synthesis = claudeService.analyze(systemPrompt, userContent);
+        String raw = claudeService.analyze(systemPrompt, userContent);
+        PhaseScoreParser.ParsedPhase parsed = PhaseScoreParser.parse(raw);
 
         return PhaseResult.builder()
                 .phaseName(getPhaseName())
                 .searchQueries(List.of())
                 .rawResults(List.of())
-                .synthesis(synthesis)
+                .synthesis(parsed.synthesis())
+                .scores(parsed.scores())
                 .completedAt(LocalDateTime.now())
                 .success(true)
                 .build();

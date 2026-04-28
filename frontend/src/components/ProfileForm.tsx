@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { InvestorProfile, RiskTolerance, InvestmentGoal, AccountType } from '../types'
+import type { InvestorProfile, RiskTolerance, InvestmentGoal, AccountType, ScreeningStrategy } from '../types'
 import { SECTORS } from '../types'
 
 interface Props {
@@ -19,6 +19,7 @@ export default function ProfileForm({ onSubmit, loading }: Props) {
     goal: 'GROWTH',
     accounts: ['TFSA'],
     currentHoldings: [],
+    screeningStrategy: 'BALANCED',
   })
   const [holdingsText, setHoldingsText] = useState('')
 
@@ -92,6 +93,20 @@ export default function ProfileForm({ onSubmit, loading }: Props) {
             <option value="INCOME">Income</option>
             <option value="PRESERVATION">Preservation</option>
             <option value="SPECULATIVE">Speculative</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Screening Strategy</label>
+          <select
+            value={form.screeningStrategy}
+            onChange={e => setForm({ ...form, screeningStrategy: e.target.value as ScreeningStrategy })}
+          >
+            <option value="BALANCED">Balanced (mixed approach)</option>
+            <option value="CANSLIM">CANSLIM (O'Neil methodology)</option>
+            <option value="VCP">VCP (Minervini momentum)</option>
+            <option value="GROWTH">Growth (revenue-led)</option>
+            <option value="VALUE_DIVIDEND">Value &amp; Dividend</option>
           </select>
         </div>
 

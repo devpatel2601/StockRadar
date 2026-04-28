@@ -4,6 +4,7 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -17,4 +18,5 @@ public class PhaseResult {
     private LocalDateTime completedAt;
     private boolean success;
     private String errorMessage;
+    private Map<String, String> scores;
 }

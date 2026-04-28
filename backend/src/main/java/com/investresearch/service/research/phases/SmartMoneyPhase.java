@@ -4,6 +4,7 @@ import com.investresearch.model.InvestorProfile;
 import com.investresearch.model.PhaseResult;
 import com.investresearch.model.SearchResult;
 import com.investresearch.service.ai.ClaudeService;
+import com.investresearch.service.research.PhaseScoreParser;
 import com.investresearch.service.research.PhaseVariantSelector;
 import com.investresearch.service.research.ResearchPhase;
 import com.investresearch.service.search.SearchService;
@@ -42,7 +43,16 @@ public class SmartMoneyPhase implements ResearchPhase {
                 : "general";
 
         String instructions = """
-                Synthesize institutional and smart money activity. Produce:
+                At the very start of your response, output EXACTLY this block (no text before it):
+
+                ---SCORES---
+                institutionalSentiment=<BULLISH|BEARISH|NEUTRAL>
+                institutionalConviction=<integer 0-100>
+                ---END SCORES---
+
+                (institutionalConviction: 100 = very high smart money conviction for equities)
+
+                Then synthesize institutional and smart money activity. Produce:
 
                 1. CONVERGENT THEMES — What are 2-3 themes multiple institutions are positioning for?
                 2. CONTRARIAN BETS — Any unusual or counter-consensus moves worth noting?
@@ -56,13 +66,15 @@ public class SmartMoneyPhase implements ResearchPhase {
                 %s
                 """.formatted(sectors, selector.smartMoneyFocus());
 
-        String synthesis = claudeService.synthesizePhase(getPhaseName(), instructions, results);
+        String raw = claudeService.synthesizePhase(getPhaseName(), instructions, results);
+        PhaseScoreParser.ParsedPhase parsed = PhaseScoreParser.parse(raw);
 
         return PhaseResult.builder()
                 .phaseName(getPhaseName())
                 .searchQueries(queries)
                 .rawResults(results)
-                .synthesis(synthesis)
+                .synthesis(parsed.synthesis())
+                .scores(parsed.scores())
                 .completedAt(LocalDateTime.now())
                 .success(true)
                 .build();

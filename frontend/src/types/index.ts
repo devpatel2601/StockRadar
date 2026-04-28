@@ -2,6 +2,7 @@ export type RiskTolerance = 'CONSERVATIVE' | 'MODERATE' | 'AGGRESSIVE'
 export type InvestmentGoal = 'GROWTH' | 'INCOME' | 'PRESERVATION' | 'SPECULATIVE'
 export type AccountType = 'TFSA' | 'RRSP' | 'NON_REGISTERED'
 export type ReportStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
+export type ScreeningStrategy = 'CANSLIM' | 'VCP' | 'GROWTH' | 'VALUE_DIVIDEND' | 'BALANCED'
 
 export interface InvestorProfile {
   country: string
@@ -12,6 +13,7 @@ export interface InvestorProfile {
   goal: InvestmentGoal
   accounts: AccountType[]
   currentHoldings: string[]
+  screeningStrategy: ScreeningStrategy
 }
 
 export interface PhaseResult {
@@ -21,6 +23,7 @@ export interface PhaseResult {
   completedAt: string
   success: boolean
   errorMessage?: string
+  scores?: Record<string, string>
 }
 
 export interface ResearchReport {

@@ -37,6 +37,12 @@ public class InvestorProfile {
 
     private List<String> currentHoldings;
 
+    private ScreeningStrategy screeningStrategy;
+
+    public enum ScreeningStrategy {
+        CANSLIM, VCP, GROWTH, VALUE_DIVIDEND, BALANCED
+    }
+
     public enum RiskTolerance {
         CONSERVATIVE, MODERATE, AGGRESSIVE
     }

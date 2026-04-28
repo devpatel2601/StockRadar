@@ -4,6 +4,7 @@ import com.investresearch.model.InvestorProfile;
 import com.investresearch.model.PhaseResult;
 import com.investresearch.model.SearchResult;
 import com.investresearch.service.ai.ClaudeService;
+import com.investresearch.service.research.PhaseScoreParser;
 import com.investresearch.service.research.PhaseVariantSelector;
 import com.investresearch.service.research.ResearchPhase;
 import com.investresearch.service.search.SearchService;
@@ -38,7 +39,17 @@ public class MacroEnvironmentPhase implements ResearchPhase {
         List<SearchResult> results = searchService.searchAll(queries);
 
         String instructions = """
-                Analyze these macroeconomic data points and produce:
+                At the very start of your response, output EXACTLY this block (no text before it):
+
+                ---SCORES---
+                regime=<BULL_MARKET|BEAR_MARKET|TRANSITION|NEUTRAL>
+                riskSentiment=<RISK_ON|RISK_OFF|NEUTRAL>
+                macroScore=<integer 0-100>
+                ---END SCORES---
+
+                (macroScore: 100 = ideal conditions for equity growth, 0 = severe recession/crisis)
+
+                Then write your full analysis:
                 1. A concise "Market Weather Report" paragraph — is the environment risk-on or risk-off?
                 2. Three key tailwinds for Canadian investors right now
                 3. Three key headwinds for Canadian investors right now
@@ -48,13 +59,15 @@ public class MacroEnvironmentPhase implements ResearchPhase {
                 %s
                 """.formatted(selector.macroFocus());
 
-        String synthesis = claudeService.synthesizePhase(getPhaseName(), instructions, results);
+        String raw = claudeService.synthesizePhase(getPhaseName(), instructions, results);
+        PhaseScoreParser.ParsedPhase parsed = PhaseScoreParser.parse(raw);
 
         return PhaseResult.builder()
                 .phaseName(getPhaseName())
                 .searchQueries(queries)
                 .rawResults(results)
-                .synthesis(synthesis)
+                .synthesis(parsed.synthesis())
+                .scores(parsed.scores())
                 .completedAt(LocalDateTime.now())
                 .success(true)
                 .build();
