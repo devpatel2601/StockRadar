@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { auth } from '../firebase'
-import type { InvestorProfile, ResearchReport, UserProfile } from '../types'
+import type { InvestorProfile, ResearchReport, UserProfile, StockPrice } from '../types'
 
 const client = axios.create({
   baseURL: '/api',
@@ -53,5 +53,10 @@ export const api = {
 
   deleteReport(id: string): Promise<void> {
     return client.delete(`/research/reports/${id}`).then(() => undefined)
+  },
+
+  // ── Live Prices ───────────────────────────────────────────────────────────
+  getStockPrices(tickers: string[]): Promise<StockPrice[]> {
+    return client.get<StockPrice[]>(`/stocks/prices?tickers=${tickers.join(',')}`).then(r => r.data)
   },
 }

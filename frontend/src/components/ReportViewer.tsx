@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
-import type { ResearchReport, PhaseResult } from '../types'
+import type { ResearchReport, PhaseResult, StockPrice } from '../types'
 import { PHASE_LABELS } from '../types'
 import { api } from '../services/api'
 import { formatDate, formatCurrency, phaseCount } from '../lib/format'
@@ -124,7 +124,11 @@ function SectorScores({ scores }: { scores?: Record<string, string> }) {
   )
 }
 
-function StockScores({ scores }: { scores?: Record<string, string> }) {
+function StockScores({ scores, livePrices, loadingPrices }: {
+  scores?: Record<string, string>
+  livePrices: Record<string, StockPrice>
+  loadingPrices: boolean
+}) {
   if (!scores) return null
   const stocks  = Object.entries(scores).filter(([k]) => k.startsWith('stock_'))
   const canslim = Object.fromEntries(
@@ -133,15 +137,32 @@ function StockScores({ scores }: { scores?: Record<string, string> }) {
   if (stocks.length === 0) return null
   return (
     <div className="phase-scores">
-      <div className="phase-scores-title">Stock Conviction Scores</div>
+      <div className="phase-scores-title">
+        Stock Conviction Scores
+        {loadingPrices && <span className="live-price-loading"> · fetching live prices…</span>}
+      </div>
       <div className="stock-scores-grid">
         {stocks.map(([key, val]) => {
           const ticker = key.replace('stock_', '')
           const conviction = parseInt(val, 10)
           const canslimVal = canslim[`canslim_${ticker}`]
+          const live = livePrices[ticker.toUpperCase()]
           return (
             <div key={ticker} className="stock-score-card">
               <div className="stock-score-ticker">{ticker}</div>
+              {live?.found ? (
+                <div className="live-price-block">
+                  <span className="live-price-value">
+                    {live.currency} {live.price.toFixed(2)}
+                  </span>
+                  <span className={`live-price-change ${live.change >= 0 ? 'price-up' : 'price-down'}`}>
+                    {live.change >= 0 ? '+' : ''}{live.change.toFixed(2)} ({live.changePercent.toFixed(2)}%)
+                  </span>
+                  <span className="live-price-label">Yahoo Finance · live</span>
+                </div>
+              ) : !loadingPrices && (
+                <div className="live-price-unavailable">Price unavailable</div>
+              )}
               <div className="stock-score-body">
                 {!isNaN(conviction) && (
                   <div className="stock-conviction-row">
@@ -175,6 +196,8 @@ export default function ReportViewer() {
   const [report, setReport] = useState<ResearchReport | null>(null)
   const [activeTab, setActiveTab] = useState<string>(FINAL_TAB)
   const [loading, setLoading] = useState(true)
+  const [livePrices, setLivePrices] = useState<Record<string, StockPrice>>({})
+  const [loadingPrices, setLoadingPrices] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -186,6 +209,29 @@ export default function ReportViewer() {
       })
       .catch(() => setLoading(false))
   }, [id])
+
+  // Fetch live prices once the report completes and stock scores are available
+  useEffect(() => {
+    if (!report || report.status !== 'COMPLETED') return
+    const stockScores = report.phases['STOCK_SCREENING']?.scores
+    if (!stockScores) return
+
+    const tickers = Object.keys(stockScores)
+      .filter(k => k.startsWith('stock_'))
+      .map(k => k.replace('stock_', ''))
+
+    if (tickers.length === 0) return
+
+    setLoadingPrices(true)
+    api.getStockPrices(tickers)
+      .then(prices => {
+        const map: Record<string, StockPrice> = {}
+        prices.forEach(p => { map[p.ticker.toUpperCase()] = p })
+        setLivePrices(map)
+      })
+      .catch(() => {})
+      .finally(() => setLoadingPrices(false))
+  }, [report?.status, report?.id])
 
   useEffect(() => {
     if (!report || !IN_FLIGHT.has(report.status)) return
@@ -315,7 +361,7 @@ export default function ReportViewer() {
                     <SectorScores scores={currentPhase.scores} />
                   )}
                   {activeTab === 'STOCK_SCREENING' && (
-                    <StockScores scores={currentPhase.scores} />
+                    <StockScores scores={currentPhase.scores} livePrices={livePrices} loadingPrices={loadingPrices} />
                   )}
 
                   {currentPhase.searchQueries?.length > 0 && (

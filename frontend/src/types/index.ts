@@ -49,6 +49,17 @@ export interface ResearchReport {
   status: ReportStatus
 }
 
+export interface StockPrice {
+  ticker: string
+  name: string
+  price: number
+  change: number
+  changePercent: number
+  previousClose: number
+  currency: string
+  found: boolean
+}
+
 export const PHASE_LABELS: Record<string, string> = {
   MACRO_ENVIRONMENT: 'Phase 1 — Macro Environment',
   SECTOR_PULSE: 'Phase 2 — Sector Pulse',

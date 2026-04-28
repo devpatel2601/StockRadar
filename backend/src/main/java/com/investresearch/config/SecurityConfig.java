@@ -23,6 +23,7 @@ public class SecurityConfig {
     // ── Easy to change: move a path here to make it public ───────────────────
     private static final String[] PUBLIC_PATHS = {
             "/api/research/**",       // auth handled inside controller via uid() fallback
+            "/api/stocks/**",         // live price lookup — no sensitive data
             "/api/tax-calendar/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",

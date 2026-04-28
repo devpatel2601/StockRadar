@@ -325,3 +325,30 @@ input:focus, select:focus { outline: none; border-color: var(--primary); }
 .rv-chip-strategy {
   background: rgba(168,85,247,0.15); color: #a855f7;
 }
+
+/* ── Live Price Block ─────────────────────────────────────────────── */
+.live-price-block {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 0 6px; border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+.live-price-value {
+  font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -0.02em;
+}
+.live-price-change {
+  font-size: 12px; font-weight: 600;
+}
+.price-up   { color: var(--success); }
+.price-down { color: var(--danger); }
+.live-price-label {
+  font-size: 10px; color: var(--text-muted); margin-top: 1px;
+}
+.live-price-unavailable {
+  font-size: 11px; color: var(--text-muted);
+  padding: 4px 0 6px; border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+.live-price-loading {
+  font-size: 10px; color: var(--text-muted);
+  font-weight: 400; letter-spacing: 0;
+}
