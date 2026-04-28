@@ -1,3 +1,17 @@
+export interface UserProfile {
+  firebaseUid: string
+  email: string
+  firstName: string
+  lastName: string
+  phone: string
+  country: string
+  province?: string
+  ageRange?: string
+  profession?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type RiskTolerance = 'CONSERVATIVE' | 'MODERATE' | 'AGGRESSIVE'
 export type InvestmentGoal = 'GROWTH' | 'INCOME' | 'PRESERVATION' | 'SPECULATIVE'
 export type AccountType = 'TFSA' | 'RRSP' | 'NON_REGISTERED'
