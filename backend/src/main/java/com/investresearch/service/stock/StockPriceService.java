@@ -49,41 +49,75 @@ public class StockPriceService {
     }
 
     private StockPrice fetchOne(String ticker) {
-        String url = YF_CHART_URL.formatted(ticker);
+        // 1. Try the ticker exactly as given
+        StockPrice result = fetchRaw(ticker, ticker);
+        if (result.found()) return result;
+
+        // 2. If it already has an exchange suffix, don't retry
+        if (hasExchangeSuffix(ticker)) return result;
+
+        // 3. Try with .TO suffix (TSX) — normalise share-class dots to hyphens first
+        //    e.g. BAM.A -> BAM-A.TO,  ATD.B -> ATD-B.TO,  SU -> SU.TO
+        String tsxSymbol = toTsxSymbol(ticker);
+        StockPrice tsxResult = fetchRaw(tsxSymbol, ticker); // keep original ticker in response
+        if (tsxResult.found()) return tsxResult;
+
+        return result;
+    }
+
+    private StockPrice fetchRaw(String symbol, String originalTicker) {
+        String url = YF_CHART_URL.formatted(symbol);
         try {
             Map<?, ?> body = webClient.get()
                     .uri(url)
-                    .header("Referer", "https://finance.yahoo.com/quote/" + ticker)
+                    .header("Referer", "https://finance.yahoo.com/quote/" + symbol)
                     .retrieve()
                     .bodyToMono(Map.class)
                     .block();
 
-            if (body == null) return notFound(ticker);
+            if (body == null) return notFound(originalTicker);
 
-            Map<?, ?> chart  = (Map<?, ?>) body.get("chart");
-            if (chart == null) return notFound(ticker);
+            Map<?, ?> chart = (Map<?, ?>) body.get("chart");
+            if (chart == null) return notFound(originalTicker);
 
             List<?> results = (List<?>) chart.get("result");
-            if (results == null || results.isEmpty()) return notFound(ticker);
+            if (results == null || results.isEmpty()) return notFound(originalTicker);
 
             Map<?, ?> meta = (Map<?, ?>) ((Map<?, ?>) results.get(0)).get("meta");
-            if (meta == null) return notFound(ticker);
+            if (meta == null) return notFound(originalTicker);
 
-            double price       = num(meta, "regularMarketPrice");
-            double prevClose   = num(meta, "chartPreviousClose");
-            double change      = price - prevClose;
-            double changePct   = prevClose != 0 ? (change / prevClose) * 100 : 0;
-            String currency    = str(meta, "currency");
-            String name        = str(meta, "longName");
+            double price     = num(meta, "regularMarketPrice");
+            double prevClose = num(meta, "chartPreviousClose");
+            double change    = price - prevClose;
+            double changePct = prevClose != 0 ? (change / prevClose) * 100 : 0;
+            String currency  = str(meta, "currency");
+            String name      = str(meta, "longName");
             if (name.isEmpty()) name = str(meta, "shortName");
 
-            log.debug("Yahoo Finance v8: {} = {} {}", ticker, currency, price);
-            return new StockPrice(ticker, name, price, change, changePct, prevClose, currency, true);
+            log.debug("Yahoo Finance v8: {} ({}) = {} {}", originalTicker, symbol, currency, price);
+            return new StockPrice(originalTicker, name, price, change, changePct, prevClose, currency, true);
 
         } catch (Exception e) {
-            log.warn("Yahoo Finance price fetch failed for {}: {}", ticker, e.getMessage());
-            return notFound(ticker);
+            log.warn("Yahoo Finance fetch failed for {} ({}): {}", originalTicker, symbol, e.getMessage());
+            return notFound(originalTicker);
         }
+    }
+
+    // Returns true if ticker already has an exchange suffix like .TO, .V, .CN, .NE
+    private boolean hasExchangeSuffix(String ticker) {
+        return ticker.matches("(?i).*\\.(TO|V|CN|NE|TSX|NYSE|NASDAQ)$");
+    }
+
+    // Converts a plain or share-class ticker to TSX Yahoo Finance format:
+    //   SU      -> SU.TO
+    //   BAM.A   -> BAM-A.TO
+    //   ATD.B   -> ATD-B.TO
+    private String toTsxSymbol(String ticker) {
+        // Share class: one letter after the last dot, e.g. BAM.A
+        if (ticker.matches("[A-Z0-9]+(\\.[A-Z])$")) {
+            return ticker.replace(".", "-") + ".TO";
+        }
+        return ticker + ".TO";
     }
 
     private StockPrice notFound(String ticker) {
