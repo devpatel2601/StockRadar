@@ -11,6 +11,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -20,9 +21,11 @@ import java.util.Map;
  *   search.provider=tavily
  *   TAVILY_API_KEY=<your-key>
  *
- * Results are cached in-memory (Caffeine) for 8 hours keyed by query string.
- * This is done manually in search() rather than via @Cacheable to avoid
- * Spring AOP self-invocation issues when searchAll() calls search() internally.
+ * Results are cached in-memory (Caffeine) keyed by "query|YYYY-MM-DD" so the
+ * cache refreshes automatically each day. Within the same day, repeated calls
+ * for the same query hit the cache. Tavily's "days=7" filter ensures only
+ * recent articles are returned, preventing stale prices/news in AI synthesis.
+ * Manual cache (not @Cacheable) to avoid Spring AOP self-invocation issues.
  */
 @Slf4j
 @Service
@@ -44,9 +47,11 @@ public class TavilySearchService implements SearchService {
     @Override
     @SuppressWarnings("unchecked")
     public List<SearchResult> search(String query) {
+        // Cache key includes today's date so results refresh every day automatically
+        String cacheKey = query + "|" + LocalDate.now();
         Cache cache = cacheManager.getCache(CacheConfig.SEARCH_RESULTS);
         if (cache != null) {
-            Cache.ValueWrapper hit = cache.get(query);
+            Cache.ValueWrapper hit = cache.get(cacheKey);
             if (hit != null) {
                 log.debug("[TavilySearch] cache hit for '{}'", query);
                 return (List<SearchResult>) hit.get();
@@ -59,7 +64,8 @@ public class TavilySearchService implements SearchService {
                     "api_key", apiKey,
                     "query", query,
                     "max_results", maxResults,
-                    "include_raw_content", false
+                    "include_raw_content", false,
+                    "days", 7          // only return articles from the last 7 days
             );
 
             Map<String, Object> response = webClientBuilder.build()
@@ -86,7 +92,7 @@ public class TavilySearchService implements SearchService {
                             .build())
                     .toList();
 
-            if (cache != null) cache.put(query, parsed);
+            if (cache != null) cache.put(cacheKey, parsed);
             return parsed;
 
         } catch (Exception e) {
