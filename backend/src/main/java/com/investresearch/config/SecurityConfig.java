@@ -22,7 +22,8 @@ public class SecurityConfig {
 
     // ── Easy to change: move a path here to make it public ───────────────────
     private static final String[] PUBLIC_PATHS = {
-            "/api/tax-calendar/**",   // public lead-magnet page
+            "/api/research/**",       // auth handled inside controller via uid() fallback
+            "/api/tax-calendar/**",
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",

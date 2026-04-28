@@ -67,6 +67,8 @@ public class ResearchController {
     }
 
     private String uid() {
-        return (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getPrincipal() == null) return "dev";
+        return (String) auth.getPrincipal();
     }
 }
